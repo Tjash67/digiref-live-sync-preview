@@ -21,8 +21,8 @@ export function mobileConsole(s,tab){
    const header=document.querySelector('.official-assignment');header.append(undo);
    quick.querySelector('.card-head')?.remove();
    const field=document.querySelector('.console-pitch');
-   const details=document.createElement('details');details.className='field-disclosure';
-   details.innerHTML='<summary>Field & crew positioning <span>View diagram ↗</span></summary>';
+   const details=document.createElement('details');details.className='field-disclosure';details.open=true;
+   details.innerHTML='<summary>Field & crew positioning <span>Diagram</span></summary>';
    field.before(details);details.append(field);
   }else{
    const main=quick.querySelector('[data-action=snap],[data-action=kick-touch]');

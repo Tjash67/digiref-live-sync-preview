@@ -1,8 +1,10 @@
 /* Live sync between paired devices */
-.sync-badge{padding:0 12px!important;border-radius:20px!important;font-weight:800;letter-spacing:.08em;background:#ffffff0c!important;border:1px solid #ffffff26!important;color:#c7bacd}
-.sync-badge.live{background:linear-gradient(135deg,#1fae6a,#128a52)!important;border-color:#4fe3a355!important;color:#eafff4!important}
-.sync-badge.connecting{background:linear-gradient(135deg,#c98a1f,#a36a12)!important;border-color:#ffd27a55!important;color:#fff6e6!important}
-.sync-badge.error{background:linear-gradient(135deg,#f13b5c,#b21638)!important;border-color:#ff9dab55!important;color:#fff!important}
+.sync-badge{display:inline-block;vertical-align:middle;flex-shrink:0;width:9px;height:9px;min-height:0!important;padding:0!important;margin:0 0 4px 9px;border-radius:50%;background:#6b6875;border:1px solid #ffffff2e!important;cursor:default}
+.sync-badge.live{background:#27d67f;box-shadow:0 0 9px #27d67f99;animation:sync-pulse 2.4s ease-in-out infinite}
+.sync-badge.connecting{background:#e8a934;box-shadow:0 0 8px #e8a93499}
+.sync-badge.error{background:#f13b5c;box-shadow:0 0 8px #f13b5c99}
+@media(prefers-reduced-motion:reduce){.sync-badge.live{animation:none}}
+@keyframes sync-pulse{0%,100%{opacity:1}50%{opacity:.55}}
 .sync-section{margin-bottom:18px}
 .sync-section h3{margin-bottom:6px}
 .sync-section .muted{margin-bottom:14px}

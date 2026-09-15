@@ -115,15 +115,17 @@ function updateSyncBadge() {
   const el = $("#sync-badge");
   if (!el) return;
   el.hidden = syncMode === "off";
-  el.textContent =
+  const label =
     syncMode === "live"
-      ? "LIVE"
+      ? "Live sync connected"
       : syncMode === "connecting"
-        ? "SYNCING"
+        ? "Connecting to shared session…"
         : syncMode === "error"
-          ? "SYNC ERROR"
+          ? "Live sync error — reconnecting"
           : "";
-  el.className = `small-button sync-badge ${syncMode}`;
+  el.title = label;
+  el.setAttribute("aria-label", label);
+  el.className = `sync-badge ${syncMode}`;
 }
 onSyncStatus((mode) => {
   syncMode = mode;
@@ -227,7 +229,7 @@ function render() {
   document.body.dataset.portal = tab;
   if (!positions(s).includes(assigned)) assigned = "R";
   $("#app").innerHTML =
-    `<header class="masthead"><div class="brand"><span class="brandmark">DR</span><span>DigiRef<small class="brand-sub">FOOTBALL PILOT</small></span></div><div class="top-actions"><span class="small-button sync-badge off" id="sync-badge" hidden>LIVE</span><button type="button" data-camera-open class="small-button">Camera</button><span class="status">Football pilot · game data local</span>${b("theme", document.documentElement.dataset.theme === "dark" ? "Light mode" : "Dark mode", "small-button")}${tab !== "ref" ? '<button type="button" data-coverage>Rules coverage</button>' : ""}${tab === "keeper" ? b("setup", "Game setup", "small-button") : ""}</div></header><main class="workspace">${storageError ? `<p class="warning">${esc(storageError)}</p>` : ""}<section class="scoreboard" aria-label="Live scoreboard"><div class="team-score"><span class="team-monogram">N</span><div><div class="team-name">Northview ${s.possession === teams[0] ? '<span class="possession-mark">●</span>' : ""}</div><div class="team-meta">Visitor · ${s.timeouts.Northview} timeouts</div></div><strong class="score">${s.score.Northview}</strong></div><div class="game-center"><div>QUARTER ${s.quarter} · ${s.ruleset}</div><strong data-game-clock>${fmt(remaining(s.game))}</strong><small>${s.untimed ? "Untimed" : s.down + " & " + Number(Math.abs(s.lineToGain - s.position).toFixed(2))}</small></div><div class="team-score right"><strong class="score">${s.score.Central}</strong><div><div class="team-name">${s.possession === teams[1] ? '<span class="possession-mark">●</span> ' : ""}Central</div><div class="team-meta">Home · ${s.timeouts.Central} timeouts</div></div><span class="team-monogram">C</span></div></section><div class="under-score"><b>${s.phase === "live" ? "LIVE BALL" : "DEAD BALL"} · ${spot(s.position)} · ${s.playType}</b><span class="status-text">${s.ruleset === "NCAA" ? "2026 rules edition" : "2025 clock guide · manual rulings"}</span></div><nav class="portal-nav" aria-label="Portals">${[
+    `<header class="masthead"><div class="brand"><span class="brandmark">DR</span><span>DigiRef<span class="sync-badge off" id="sync-badge" hidden role="status"></span><small class="brand-sub">FOOTBALL PILOT</small></span></div><div class="top-actions"><button type="button" data-camera-open class="small-button">Camera</button><span class="status">Football pilot · game data local</span>${b("theme", document.documentElement.dataset.theme === "dark" ? "Light mode" : "Dark mode", "small-button")}${tab !== "ref" ? '<button type="button" data-coverage>Rules coverage</button>' : ""}${tab === "keeper" ? b("setup", "Game setup", "small-button") : ""}</div></header><main class="workspace">${storageError ? `<p class="warning">${esc(storageError)}</p>` : ""}<section class="scoreboard" aria-label="Live scoreboard"><div class="team-score"><span class="team-monogram">N</span><div><div class="team-name">Northview ${s.possession === teams[0] ? '<span class="possession-mark">●</span>' : ""}</div><div class="team-meta">Visitor · ${s.timeouts.Northview} timeouts</div></div><strong class="score">${s.score.Northview}</strong></div><div class="game-center"><div>QUARTER ${s.quarter} · ${s.ruleset}</div><strong data-game-clock>${fmt(remaining(s.game))}</strong><small>${s.untimed ? "Untimed" : s.down + " & " + Number(Math.abs(s.lineToGain - s.position).toFixed(2))}</small></div><div class="team-score right"><strong class="score">${s.score.Central}</strong><div><div class="team-name">${s.possession === teams[1] ? '<span class="possession-mark">●</span> ' : ""}Central</div><div class="team-meta">Home · ${s.timeouts.Central} timeouts</div></div><span class="team-monogram">C</span></div></section><div class="under-score"><b>${s.phase === "live" ? "LIVE BALL" : "DEAD BALL"} · ${spot(s.position)} · ${s.playType}</b><span class="status-text">${s.ruleset === "NCAA" ? "2026 rules edition" : "2025 clock guide · manual rulings"}</span></div><nav class="portal-nav" aria-label="Portals">${[
       ["ref", "01", "Referee"],
       ["keeper", "02", "Scorekeeper"],
       ["reports", "03", "Reports"],
