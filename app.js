@@ -225,6 +225,9 @@ window.addEventListener("storage", (e) => {
   }
 });
 function render() {
+  const advancedWasOpen = !!document.querySelector(
+    "#advanced-game-controls[open]",
+  );
   const s = state();
   document.body.dataset.portal = tab;
   if (!positions(s).includes(assigned)) assigned = "R";
@@ -245,7 +248,7 @@ function render() {
   if(tab==='keeper'){
     const advanced=document.createElement('details');
     advanced.id='advanced-game-controls';
-    advanced.open=true;
+    advanced.open=advancedWasOpen||s.flags.some(f=>f.outcome==='pending')||(!!s.currentPlay&&s.playType!=='scrimmage');
     advanced.innerHTML='<summary>Advanced controls · scoring, kicks, corrections & penalties</summary>';
     while(portal.firstChild)advanced.append(portal.firstChild);
     portal.append(advanced);
@@ -442,8 +445,26 @@ function openEnforce() {
       )
       .join(
         "",
-      )}<details><summary>Yardage calculator / verified simple call</summary><p class="muted">Select the base and offending team yourself. Half-distance arithmetic does not decide the applicable rule. DPI, goal-line and special enforcement may require a different final spot.</p><div class="form-grid">${sel("calcTeam", "Offending team", teams, pending[0].team)}${sel("baseType", "Enforcement basis", ["Succeeding spot", "Previous spot", "End of run", "Spot of foul", "Basic spot", "Post-scrimmage kick spot"], "Succeeding spot")}${num("base", "Base coordinate", s.position, 0, 100, ".01")}${num("yards", "Yards", 5, 0, 99, ".01")}<label class="checkbox wide"><input name="half" type="checkbox" checked>Limit to half the distance</label>${b("calculate", "Preview yardage", "wide")}${b("simple-ruling", "Fill verified NCAA false start", "wide")}</div><p id="calculation" class="info">No calculation applied.</p></details><h3 style="margin:20px 0 12px">Confirm the resulting game state</h3><div class="form-grid">${num("position", "Final ball coordinate", s.position, 0, 100, ".01")}${num("lineToGain", "Final line to gain", s.lineToGain, 0, 100, ".01")}${num("down", "Next down", s.down, 1, 4)}${sel("possession", "Next possession", teams, s.possession)}${sel("restart", "Game clock restart", restartOptions, s.restart)}${sel("playClock", "Play clock seconds", [25, 40], pc)}<label class="wide">Ruling, sequence & rule reference<textarea name="reason" required placeholder="Explain the choices, enforcement order, first/loss/repeat down effects and cited exception."></textarea></label><label class="checkbox wide"><input name="confirmed" type="checkbox" required>I confirm the ruling, all outcomes and the final state.</label><button class="red wide">Apply confirmed ruling</button></div></form>`;
+      )}<details><summary>Yardage calculator / verified simple call</summary><p class="muted">Select the base and offending team yourself. Half-distance arithmetic does not decide the applicable rule. DPI, goal-line and special enforcement may require a different final spot.</p><div class="form-grid">${sel("calcTeam", "Offending team", teams, pending[0].team)}${sel("baseType", "Enforcement basis", ["Succeeding spot", "Previous spot", "End of run", "Spot of foul", "Basic spot", "Post-scrimmage kick spot"], "Succeeding spot")}${num("base", "Base coordinate", s.position, 0, 100, ".01")}${num("yards", "Yards", 5, 0, 99, ".01")}<label class="checkbox wide"><input name="half" type="checkbox" checked>Limit to half the distance</label>${b("simple-ruling", "Fill verified NCAA false start", "wide")}</div><p id="calculation" class="info">Calculating…</p></details><h3 style="margin:20px 0 12px">Confirm the resulting game state</h3><div class="form-grid">${num("position", "Final ball coordinate", s.position, 0, 100, ".01")}${num("lineToGain", "Final line to gain", s.lineToGain, 0, 100, ".01")}${num("down", "Next down", s.down, 1, 4)}${sel("possession", "Next possession", teams, s.possession)}${sel("restart", "Game clock restart", restartOptions, s.restart)}${sel("playClock", "Play clock seconds", [25, 40], pc)}<label class="wide">Ruling, sequence & rule reference<textarea name="reason" required placeholder="Explain the choices, enforcement order, first/loss/repeat down effects and cited exception."></textarea></label><label class="checkbox wide"><input name="confirmed" type="checkbox" required>I confirm the ruling, all outcomes and the final state.</label><button class="red wide">Apply confirmed ruling</button></div></form>`;
   $("#enforce-dialog").showModal();
+  refreshEnforceCalc();
+}
+function refreshEnforceCalc() {
+  const f = $("#enforcement-form"),
+    calc = $("#calculation");
+  if (!f || !calc) return;
+  try {
+    const p = previewDistance(state(), {
+      base: f.elements.base.value,
+      yards: f.elements.yards.value,
+      team: f.elements.calcTeam.value,
+      half: f.elements.half.checked,
+    });
+    f.elements.position.value = p.position;
+    calc.textContent = `${p.yards} yards${p.half ? " (half-distance limit applied)" : ""} from ${spot(Number(f.elements.base.value))} → ${spot(p.position)}. Final spot filled in below — check line to gain and down.`;
+  } catch (err) {
+    calc.textContent = err.message;
+  }
 }
 function syncSectionHTML() {
   const code = currentCode();
@@ -761,22 +782,7 @@ document.addEventListener("click", async (e) => {
     ].includes(a)
   )
     await act({ type: a.toUpperCase().replaceAll("-", "_") });
-  else if (a === "calculate") {
-    try {
-      let f = $("#enforcement-form"),
-        p = previewDistance(state(), {
-          base: f.elements.base.value,
-          yards: f.elements.yards.value,
-          team: f.elements.calcTeam.value,
-          half: f.elements.half.checked,
-        });
-      f.elements.position.value = p.position;
-      $("#calculation").textContent =
-        `${p.yards} yards${p.half ? " (half-distance)" : ""} → ${spot(p.position)}. Final spot filled; confirm line to gain and down separately.`;
-    } catch (err) {
-      toast(err.message);
-    }
-  } else if (a === "simple-ruling") {
+  else if (a === "simple-ruling") {
     const s = state(),
       pending = s.flags.filter((f) => f.outcome === "pending"),
       c = catalog.find((c) => c.id === pending[0]?.callId);
@@ -885,9 +891,19 @@ document.addEventListener("click", async (e) => {
 });
 document.addEventListener("input", (e) => {
   if (e.target.id === "call-search") renderCalls();
+  if (
+    e.target.closest("#enforcement-form") &&
+    ["base", "yards"].includes(e.target.name)
+  )
+    refreshEnforceCalc();
 });
 document.addEventListener("change", (e) => {
   if (["call-category", "all-calls"].includes(e.target.id)) renderCalls();
+  if (
+    e.target.closest("#enforcement-form") &&
+    ["calcTeam", "baseType", "half"].includes(e.target.name)
+  )
+    refreshEnforceCalc();
   if (e.target.dataset.filter) {
     filters[e.target.dataset.filter] = e.target.value;
     render();
