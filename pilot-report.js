@@ -1,0 +1,37 @@
+import {fmt,spot,statistics,remaining} from './engine.js';
+import {trackingSummary} from './quick-game.js';
+
+const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,character=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
+const average=value=>value===null?'Not measured':`${value.toFixed(1)} seconds`;
+
+export function createPilotReport(doc,{camera=null,generatedAt=new Date().toISOString()}={}){
+  if(!doc?.state||!Array.isArray(doc.audit))throw new Error('A valid DigiRef game is required.');
+  const state=doc.state,stats=statistics(state),completed=state.plays.filter(play=>!play.noPlay);
+  const callsByOutcome=Object.fromEntries(Object.entries(stats.outcomes).sort(([a],[b])=>a.localeCompare(b)));
+  const callsByCategory=Object.fromEntries(stats.groups('category'));
+  const callsByOfficial=Object.fromEntries(stats.groups('official'));
+  return {
+    schema:'digiref-football-pilot-report',version:1,generatedAt,
+    reportId:globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    sport:'football',ruleset:state.ruleset,
+    tracking:trackingSummary(state,doc),
+    game:{quarter:state.quarter,gameClock:fmt(remaining(state.game)),score:{...state.score},possession:state.possession,ballSpot:spot(state.position),down:state.down,lineToGain:spot(state.lineToGain)},
+    summary:{completedPlays:completed.length,noPlayDowns:state.plays.length-completed.length,totalCalls:state.flags.length,pendingCalls:state.flags.filter(flag=>flag.outcome==='pending').length,auditEvents:doc.audit.length,completedAdministrations:stats.admins.length,stoppages:state.stoppages.length,clockCorrections:state.corrections.length},
+    pace:{penaltyAdministrationAverage:stats.adminAverage,betweenSnapsAverage:stats.snapAverage,deadBallAverage:stats.deadAverage,teamTimeoutAverage:stats.timeoutAverage},
+    distributions:{callsByOutcome,callsByCategory,callsByOfficial,playsByQuarter:Object.fromEntries([1,2,3,4].map(quarter=>[quarter,state.plays.filter(play=>play.quarter===quarter&&!play.noPlay).length]))},
+    calls:state.flags.map(flag=>({playId:flag.playId,quarter:flag.quarter,gameClock:fmt(flag.game),team:flag.team,official:flag.official,name:flag.name,category:flag.category,outcome:flag.outcome,fieldSpot:spot(flag.position),citation:flag.citation||null,note:flag.ruling||flag.note||null})),
+    camera:camera?{source:camera.source,active:Boolean(camera.active),calibrated:Boolean(camera.calibrated),calibrationWarning:camera.calibrationWarning||null,observerSummary:camera.observerSummary||null}:{source:'not reported',active:false,calibrated:false,calibrationWarning:null,observerSummary:null},
+    limitations:['Human-entered game state may contain omissions or corrections.','The web pilot does not preserve a native master video recording.','AI observations are candidates only and do not establish a foul, no-foul, or official performance.','Counts and pace metrics do not establish accuracy or bias.']
+  };
+}
+
+export function renderPilotReportHTML(report){
+ const r=report.tracking;
+ const extra=r?`<section><h2>Tracking quality &amp; review markers</h2><p>${r.recordedPlays} recorded plays · ${r.completions} completions · ${r.incompletions} incompletions · ${r.correctionActions} correction/undo actions</p><ul>${r.warnings.map(w=>`<li>${escapeHTML(w)}</li>`).join('')}</ul><h3>Review playlist</h3>${r.markers.map(m=>`<p>${escapeHTML(m.kind)} · Q${m.quarter} ${fmt(m.game)} · ${m.playId?'Play '+m.playId:'Between plays'} · ${spot(m.position)}<br>Evidence correlation ID: ${escapeHTML(m.id)}</p>`).join('')||'<p>No markers recorded.</p>'}<p>Find the corresponding video marker in Saved video when recording was active. This report does not embed footage.</p><h3>Recorded scoring plays</h3>${r.scoringPlays.map(p=>`<p>Q${p.quarter} · Play ${p.id} · ${escapeHTML(p.result)} · possession at start: ${escapeHTML(p.possession)}</p>`).join('')||'<p>No scoring plays recorded.</p>'}</section>`:'';
+ return renderBaseReportHTML(report).replace('<section class="warning">',extra+'<section class="warning">');
+}
+function renderBaseReportHTML(report){
+  const rows=object=>Object.entries(object).map(([label,value])=>`<tr><th>${escapeHTML(label)}</th><td>${escapeHTML(value)}</td></tr>`).join('');
+  const calls=report.calls.map(call=>`<tr><td>${escapeHTML(call.playId)}<br>Q${escapeHTML(call.quarter)} ${escapeHTML(call.gameClock)}</td><td>${escapeHTML(call.name)}<br><small>${escapeHTML(call.category||'Unclassified')}</small></td><td>${escapeHTML(call.team)}</td><td>${escapeHTML(call.official)}</td><td>${escapeHTML(call.outcome)}</td><td>${escapeHTML(call.note||'—')}</td></tr>`).join('');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>DigiRef football pilot report</title><style>body{font:16px system-ui;max-width:1050px;margin:40px auto;padding:0 20px;color:#17181c}h1{margin-bottom:4px}.muted,small{color:#60646c}section{margin:28px 0}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:10px;border-bottom:1px solid #ddd;vertical-align:top}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}.metric{padding:16px;background:#f3f4f6;border-radius:8px}.metric strong{display:block;font-size:1.6rem}footer{border-top:1px solid #ddd;padding-top:18px}.warning{padding:14px;border-left:4px solid #c8102e;background:#fff1f3}</style></head><body><header><h1>DigiRef football pilot report</h1><p class="muted">${escapeHTML(report.generatedAt)} · ${escapeHTML(report.ruleset)} · Report ${escapeHTML(report.reportId)}</p></header><section class="grid"><div class="metric">Completed plays<strong>${report.summary.completedPlays}</strong></div><div class="metric">Calls recorded<strong>${report.summary.totalCalls}</strong></div><div class="metric">Pending calls<strong>${report.summary.pendingCalls}</strong></div><div class="metric">Audit events<strong>${report.summary.auditEvents}</strong></div></section><section><h2>Game state</h2><table>${rows({...report.game.score,Quarter:report.game.quarter,'Game clock':report.game.gameClock,Possession:report.game.possession,'Ball spot':report.game.ballSpot,Down:report.game.down,'Line to gain':report.game.lineToGain})}</table></section><section><h2>Pace</h2><table>${rows({'Penalty administration':average(report.pace.penaltyAdministrationAverage),'Between legal snaps':average(report.pace.betweenSnapsAverage),'Dead-ball time':average(report.pace.deadBallAverage),'Team timeout':average(report.pace.teamTimeoutAverage)})}</table></section><section><h2>Video and observer status</h2><table>${rows({Source:report.camera.source,Active:report.camera.active?'Yes':'No','Field calibrated':report.camera.calibrated?'Yes':'No','Calibration warning':report.camera.calibrationWarning||'None','AI reviews completed':report.camera.observerSummary?.reviewsCompleted??0,'AI reviews failed':report.camera.observerSummary?.reviewsFailed??0})}</table></section><section><h2>Calls</h2><table><thead><tr><th>Play</th><th>Call</th><th>Team</th><th>Official</th><th>Outcome</th><th>Notes</th></tr></thead><tbody>${calls||'<tr><td colspan="6">No calls recorded.</td></tr>'}</tbody></table></section><section class="warning"><h2>Interpretation limits</h2><ul>${report.limitations.map(value=>`<li>${escapeHTML(value)}</li>`).join('')}</ul></section><footer>DigiRef supplies evidence and workflow support. Final authority remains with authorized human officials.</footer></body></html>`;
+}

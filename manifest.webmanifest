@@ -1,0 +1,11 @@
+{
+  "id": "/",
+  "name": "DigiRef Football Pilot",
+  "short_name": "DigiRef",
+  "start_url": "/?source=homescreen",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#101319",
+  "theme_color": "#c8102e",
+  "icons": [{"src":"/favicon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}]
+}
