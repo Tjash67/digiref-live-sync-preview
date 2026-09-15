@@ -13,6 +13,7 @@ import {
   positions,
   previewDistance,
   statistics,
+  direction,
 } from "./engine.js";
 import {
   esc,
@@ -440,12 +441,12 @@ function openEnforce() {
               ["kickoff", "Enforce on kickoff (pending)"],
               ["administrative", "Administrative ruling"],
             ],
-            "",
+            f.callId ? "accepted" : "",
           )}</div>`,
       )
       .join(
         "",
-      )}<details><summary>Yardage calculator / verified simple call</summary><p class="muted">Select the base and offending team yourself. Half-distance arithmetic does not decide the applicable rule. DPI, goal-line and special enforcement may require a different final spot.</p><div class="form-grid">${sel("calcTeam", "Offending team", teams, pending[0].team)}${sel("baseType", "Enforcement basis", ["Succeeding spot", "Previous spot", "End of run", "Spot of foul", "Basic spot", "Post-scrimmage kick spot"], "Succeeding spot")}${num("base", "Base coordinate", s.position, 0, 100, ".01")}${num("yards", "Yards", 5, 0, 99, ".01")}<label class="checkbox wide"><input name="half" type="checkbox" checked>Limit to half the distance</label>${b("simple-ruling", "Fill verified NCAA false start", "wide")}</div><p id="calculation" class="info">Calculating…</p></details><h3 style="margin:20px 0 12px">Confirm the resulting game state</h3><div class="form-grid">${num("position", "Final ball coordinate", s.position, 0, 100, ".01")}${num("lineToGain", "Final line to gain", s.lineToGain, 0, 100, ".01")}${num("down", "Next down", s.down, 1, 4)}${sel("possession", "Next possession", teams, s.possession)}${sel("restart", "Game clock restart", restartOptions, s.restart)}${sel("playClock", "Play clock seconds", [25, 40], pc)}<label class="wide">Ruling, sequence & rule reference<textarea name="reason" required placeholder="Explain the choices, enforcement order, first/loss/repeat down effects and cited exception."></textarea></label><label class="checkbox wide"><input name="confirmed" type="checkbox" required>I confirm the ruling, all outcomes and the final state.</label><button class="red wide">Apply confirmed ruling</button></div></form>`;
+      )}<details><summary>Yardage calculator / verified simple call</summary><p class="muted">Select the base and offending team yourself. Half-distance arithmetic does not decide the applicable rule. DPI, goal-line and special enforcement may require a different final spot.</p><div class="form-grid">${sel("calcTeam", "Offending team", teams, pending[0].team)}${sel("baseType", "Enforcement basis", ["Succeeding spot", "Previous spot", "End of run", "Spot of foul", "Basic spot", "Post-scrimmage kick spot"], "Succeeding spot")}${num("base", "Base coordinate", s.position, 0, 100, ".01")}${num("yards", "Yards", 5, 0, 99, ".01")}<label class="checkbox wide"><input name="half" type="checkbox" checked>Limit to half the distance</label><label class="checkbox wide"><input name="autoFirstDown" type="checkbox">This call is an automatic first down (fills down &amp; line to gain below)</label>${b("simple-ruling", "Fill verified NCAA false start", "wide")}</div><p id="calculation" class="info">Calculating…</p></details><h3 style="margin:20px 0 12px">Confirm the resulting game state</h3><div class="form-grid">${num("position", "Final ball coordinate", s.position, 0, 100, ".01")}${num("lineToGain", "Final line to gain", s.lineToGain, 0, 100, ".01")}${num("down", "Next down", s.down, 1, 4)}${sel("possession", "Next possession", teams, s.possession)}${sel("restart", "Game clock restart", restartOptions, s.restart)}${sel("playClock", "Play clock seconds", [25, 40], pc)}<label class="wide">Ruling, sequence & rule reference<textarea name="reason" required placeholder="Explain the choices, enforcement order, first/loss/repeat down effects and cited exception."></textarea></label><label class="checkbox wide"><input name="confirmed" type="checkbox" required>I confirm the ruling, all outcomes and the final state.</label><button class="red wide">Apply confirmed ruling</button></div></form>`;
   $("#enforce-dialog").showModal();
   refreshEnforceCalc();
 }
@@ -454,14 +455,34 @@ function refreshEnforceCalc() {
     calc = $("#calculation");
   if (!f || !calc) return;
   try {
-    const p = previewDistance(state(), {
+    const s = state();
+    const p = previewDistance(s, {
       base: f.elements.base.value,
       yards: f.elements.yards.value,
       team: f.elements.calcTeam.value,
       half: f.elements.half.checked,
     });
     f.elements.position.value = p.position;
-    calc.textContent = `${p.yards} yards${p.half ? " (half-distance limit applied)" : ""} from ${spot(Number(f.elements.base.value))} → ${spot(p.position)}. Final spot filled in below — check line to gain and down.`;
+    if (f.elements.autoFirstDown.checked) {
+      const dir = direction(s),
+        ltg = Math.max(0, Math.min(100, p.position + 10 * dir));
+      f.elements.down.value = 1;
+      f.elements.lineToGain.value = ltg;
+      calc.textContent = `${p.yards} yards${p.half ? " (half-distance limit applied)" : ""} from ${spot(Number(f.elements.base.value))} → ${spot(p.position)}. Automatic first down: down and line to gain filled in below.`;
+    } else {
+      f.elements.down.value = s.down;
+      f.elements.lineToGain.value = s.lineToGain;
+      calc.textContent = `${p.yards} yards${p.half ? " (half-distance limit applied)" : ""} from ${spot(Number(f.elements.base.value))} → ${spot(p.position)}. Down repeats — check "automatic first down" above if this call awards one.`;
+    }
+    const pending = s.flags.filter((x) => x.outcome === "pending");
+    const auto =
+      pending.length === 1
+        ? `${pending[0].name || "Flag"}: ${p.yards} yard${p.yards === 1 ? "" : "s"} enforced from ${spot(Number(f.elements.base.value))} to ${spot(p.position)}. ${f.elements.autoFirstDown.checked ? "Automatic first down." : "Down repeats."}`
+        : "Multiple fouls — describe the enforcement order, any offsetting/carryover treatment, and the final down and distance.";
+    if (!f.elements.reason.value || f.elements.reason.value === f.elements.reason.dataset.auto) {
+      f.elements.reason.value = auto;
+      f.elements.reason.dataset.auto = auto;
+    }
   } catch (err) {
     calc.textContent = err.message;
   }
@@ -901,7 +922,7 @@ document.addEventListener("change", (e) => {
   if (["call-category", "all-calls"].includes(e.target.id)) renderCalls();
   if (
     e.target.closest("#enforcement-form") &&
-    ["calcTeam", "baseType", "half"].includes(e.target.name)
+    ["calcTeam", "baseType", "half", "autoFirstDown"].includes(e.target.name)
   )
     refreshEnforceCalc();
   if (e.target.dataset.filter) {
