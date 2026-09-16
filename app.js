@@ -698,6 +698,11 @@ document.addEventListener("click", async (e) => {
     }
     return;
   }
+  if (target.dataset.gainPreset !== undefined) {
+    const input = target.closest("form")?.elements.gain;
+    if (input) input.value = target.dataset.gainPreset;
+    return;
+  }
   const a = target.dataset.action;
   if (!a) return;
   if(['quick-mark','quick-no-call','quick-review'].includes(a)){
@@ -961,9 +966,9 @@ document.addEventListener("submit", async (e) => {
     return;
   }
   if(id==='quick-result-form'){
-    const yard=Number(data.yard);
-    if(!data.yard.trim()||!Number.isFinite(yard)||yard<0||yard>50){toast('Enter an ending yard line from 0 to 50.');return;}
-    await act({type:'RESULT',result:data.result,endPosition:data.endSide==='central'?100-yard:yard,expectedRevision:Number(form.dataset.revision)});
+    const gain=Number(data.gain);
+    if(data.gain.trim()===''||!Number.isFinite(gain)){toast('Enter the yards gained (or lost, as a negative number).');return;}
+    await act({type:'RESULT',result:data.result,gain,expectedRevision:Number(form.dataset.revision)});
     return;
   }
   if (id === "ai-form") {

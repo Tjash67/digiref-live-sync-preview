@@ -1,3 +1,7 @@
+.gain-presets{grid-template-columns:repeat(4,1fr)!important;gap:6px!important;margin-bottom:2px}
+.gain-presets button{min-height:40px!important;font-weight:800;font-variant-numeric:tabular-nums}
+@media(min-width:850px){.gain-presets{grid-template-columns:repeat(8,1fr)!important}}
+
 /* Live sync between paired devices */
 .sync-badge{display:inline-block;vertical-align:middle;flex-shrink:0;width:9px;height:9px;min-height:0!important;padding:0!important;margin:0 0 4px 9px;border-radius:50%;background:#6b6875;border:1px solid #ffffff2e!important;cursor:default}
 .sync-badge.live{background:#27d67f;box-shadow:0 0 9px #27d67f99;animation:sync-pulse 2.4s ease-in-out infinite}

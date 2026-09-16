@@ -66,7 +66,7 @@ export function reduce(state,action,now=Date.now()) {
   const r=a.result;const allowed=['Run','Complete','Incomplete','Out of bounds','Turnover','Touchdown','Field goal','Safety','Touchback','Try good (1)','Try good (2)','Try no good','No play'];if(!allowed.includes(r))throw Error('Choose a play result.');
   if(a.endPosition!==undefined&&String(a.endPosition).trim()==='')throw Error('Enter the ending yard line.');
   const gain=a.endPosition!==undefined?(number(a.endPosition,0,100,'Ending spot')-s.position)*direction(s):number(a.gain??0,-100,100,'Gain');const oldTeam=s.possession;
-  if(a.endPosition!==undefined&&['Run','Complete','Out of bounds','Turnover'].includes(r)&&[0,100].includes(Number(a.endPosition)))throw Error('Goal-line result requires score, safety, or touchback confirmation in advanced controls.');
+  if(['Run','Complete','Out of bounds','Turnover'].includes(r)&&[0,100].includes(clamp(s.position+gain*direction(s),0,100)))throw Error('Goal-line result requires score, safety, or touchback confirmation in advanced controls.');
   s.currentPlay.entryMethod=a.endPosition!==undefined?'ending_spot':'result_form';
   const hadWhistle=s.whistleAt!==null;s.whistleAt=s.whistleAt??now;s.deadSince=s.deadSince??now;s.phase='dead';
   if(!['Incomplete','No play'].includes(r))s.position=clamp(s.position+gain*direction(s),0,100);
